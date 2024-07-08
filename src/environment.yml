@@ -1,0 +1,32 @@
+name: MicroRec
+channels:
+  - defaults
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.9
+  - pillow=10.3.0
+  - loguru=0.5.3
+  - pytest=7.4.0
+  - imageio=2.31.4
+  - matplotlib=3.8.0
+  - tqdm=4.66.1
+  - scipy=1.13.1
+  - porespy=2.4.1
+  - thefuzz=0.22.1
+  - rapidfuzz=3.6.1
+  - seaborn=0.12.2
+  - pip=23.3.1
+  - pip:
+    - loguru==0.7.2
+    - timeout_decorator==0.5.0
+    - "--find-links https://download.pytorch.org/whl/torch_stable.html"
+    - torch==2.2.2+cu118
+    - torchvision==0.17.2+cu118
+    - rouge-score==0.1.2
+    # Manage the below packages over pip to avoid segmentation fault in transformers on Mac
+    - huggingface-hub==0.20.1
+    - transformers==4.36.2
+    - datasets==2.16.1
+    - numpy==1.26.2
+    - pypardiso==0.4.6
