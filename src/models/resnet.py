@@ -1,3 +1,5 @@
+## SOURCE (for part): https://github.com/eugenebak/RP-LAT/blob/master/model.py
+
 import torch
 import torch.nn as nn
 

@@ -1,5 +1,60 @@
 #!/usr/bin/env python
 
+import torch
+from torch import nn
+from torchvision.utils import save_image
+import os
+
+def sample_images(generator, num_samples, save_dir, device):
+    generator.eval()
+    noise = torch.randn(num_samples, 100, 1, 1, device=device)
+    with torch.no_grad():
+        fake_images = generator(noise).detach().cpu()
+    for i in range(num_samples):
+        save_image(fake_images[i], os.path.join(save_dir, f'generated_image_{i}.png'))
+    print(f'Saved {num_samples} generated images to {save_dir}')
+
+class Generator(nn.Module):
+    def __init__(self):
+        super(Generator, self).__init__()
+        self.main = nn.Sequential(
+            nn.ConvTranspose2d(100, 64 * 16, 4, 1, 0, bias=False),
+            nn.BatchNorm2d(64 * 16),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(64 * 16, 64 * 8, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(64 * 8),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(64 * 8, 64 * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(64 * 4),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(64 * 4, 64 * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(64 * 2),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(64 * 2, 64, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(64, 1, 4, 2, 1, bias=False),
+            nn.Tanh()
+        )
+
+    def forward(self, input):
+        return self.main(input)
+
+
+checkpoint = torch.load(r'results\gan\checkpoint_epoch_90.pth')
+device = torch.device('cpu')
+
+netG = Generator().to(device)
+netG.load_state_dict(checkpoint['generator_state_dict'])
+
+sample_images(netG, num_samples=5, save_dir='figs/generated_images', device=device)
+
+
+
+
+
+
+
 import os
 from PIL import Image
 from torchvision import transforms
@@ -56,27 +111,25 @@ class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
         self.main = nn.Sequential(
-            nn.ConvTranspose2d(100, 64 * 16, 4, 1, 0, bias=False),   # Output size: (batch_size, 1024, 4, 4)
+            nn.ConvTranspose2d(100, 64 * 16, 4, 1, 0, bias=False),
             nn.BatchNorm2d(64 * 16),
             nn.ReLU(True),
-            nn.ConvTranspose2d(64 * 16, 64 * 8, 4, 2, 1, bias=False),  # Output size: (batch_size, 512, 8, 8)
+            nn.ConvTranspose2d(64 * 16, 64 * 8, 4, 2, 1, bias=False),
             nn.BatchNorm2d(64 * 8),
             nn.ReLU(True),
-            nn.ConvTranspose2d(64 * 8, 64 * 4, 4, 2, 1, bias=False),   # Output size: (batch_size, 256, 16, 16)
+            nn.ConvTranspose2d(64 * 8, 64 * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(64 * 4),
             nn.ReLU(True),
-            nn.ConvTranspose2d(64 * 4, 64 * 2, 4, 2, 1, bias=False),   # Output size: (batch_size, 128, 32, 32)
+            nn.ConvTranspose2d(64 * 4, 64 * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(64 * 2),
             nn.ReLU(True),
-            nn.ConvTranspose2d(64 * 2, 64, 4, 2, 1, bias=False),       # Output size: (batch_size, 64, 64, 64)
+            nn.ConvTranspose2d(64 * 2, 64, 4, 2, 1, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(True),
-            nn.ConvTranspose2d(64, 1, 4, 2, 1, bias=False),           # Output size: (batch_size, 1, 128, 128)
-            nn.BatchNorm2d(1),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(1, 1, 4, 2, 1, bias=False),           # Output size: (batch_size, 1, 256, 256)
+            nn.ConvTranspose2d(64, 1, 4, 2, 1, bias=False),
             nn.Tanh()
         )
+
     def forward(self, input):
         return self.main(input)
 
@@ -95,11 +148,51 @@ class Discriminator(nn.Module):
             nn.Conv2d(256, 512, 4, 2, 1, bias=False),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(512, 1, 16, 1, 0, bias=False),
+            nn.Conv2d(512, 1, 4, 1, 0, bias=False),
             nn.Sigmoid()
         )
+        self.a = nn.Conv2d(1, 64, 4, 2, 1, bias=False)
+        self.b = nn.LeakyReLU(0.2, inplace=True)
+        self.c = nn.Conv2d(64, 128, 4, 2, 1, bias=False)
+        self.d= nn.BatchNorm2d(128)
+        self.e= nn.LeakyReLU(0.2, inplace=True)
+        self.f= nn.Conv2d(128, 256, 4, 2, 1, bias=False)
+        self.g= nn.BatchNorm2d(256)
+        self.h= nn.LeakyReLU(0.2, inplace=True)
+        self.i= nn.Conv2d(256, 512, 4, 2, 1, bias=False)
+        self.j= nn.BatchNorm2d(512)
+        self.k= nn.LeakyReLU(0.2, inplace=True)
+        self.l= nn.Conv2d(512, 1, 4, 1, 0, bias=False)
+        self.m= nn.Sigmoid()
+        
 
     def forward(self, input):
+        a = self.a(input)
+        print(a.shape)
+        b = self.b(a)
+        print(b.shape)
+        c = self.c(b)
+        print(c.shape)
+        d = self.d(c)
+        print(d.shape)
+        e = self.e(d)
+        print(e.shape)
+        f = self.f(e)
+        print(f.shape)
+        g = self.g(f)
+        print(g.shape)
+        h = self.h(g)
+        print(h.shape)
+        i = self.i(h)
+        print(i.shape)
+        j = self.j(i)
+        print(j.shape)
+        k = self.k(j)
+        print(k.shape)
+        l = self.l(k)
+        print(l.shape)
+        m = self.m(l)
+        print(m.shape)
         return self.main(input)
 
 netG = Generator().to(device)
@@ -121,7 +214,7 @@ def pore_size_distribution(image):
 def two_point_correlation(image):
     return ps.metrics.two_point_correlation(image)
 
-num_epochs = 3000
+num_epochs = 2
 fixed_noise = torch.randn(64, 100, 1, 1, device=device)
 
 for epoch in range(num_epochs):
@@ -130,7 +223,9 @@ for epoch in range(num_epochs):
         real_images = images.to(device)
         b_size = real_images.size(0)
         label = torch.full((b_size,), 1., device=device)
+        print(label.shape)
         output = netD(real_images).view(-1)
+        print(output.shape)
         errD_real = criterion(output, label)
         errD_real.backward()
         
@@ -152,7 +247,7 @@ for epoch in range(num_epochs):
         if i % 50 == 0:
             print(f'Epoch [{epoch+1}/{num_epochs}] Batch [{i}/{len(dataloader)}] Loss D: {errD_real + errD_fake}, Loss G: {errG}')
     
-    if epoch % 50 == 0:
+    if epoch % 10 == 0:
         torch.save({
             'epoch': epoch,
             'generator_state_dict': netG.state_dict(),
@@ -179,7 +274,7 @@ for epoch in range(num_epochs):
     tpc_real = two_point_correlation(real_image[0])
     tpc_fake = two_point_correlation(fake_image[0])
 
-    if epoch % 50 == 0:
+    if epoch % 10 == 0:
         print(f'+------------------------+-------------------+-------------------+')
         print(f'| Metric                 | Real              | Fake              |')
         print(f'+------------------------+-------------------+-------------------+')
