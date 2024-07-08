@@ -88,13 +88,13 @@ def main_worker(gpu, args):
     
     if args.rank == 0:
         print('Building optimizer: sgd')
-
-    # could use adam?
+    # could use adam
     optimizer = torch.optim.SGD(
             filter(lambda p: p.requires_grad, model.parameters()),
             args.lr,
             momentum=args.momentum,
             weight_decay=args.weight_decay)    
+    
     if args.rank == 0:
         print('Building dataloader and criterion')
     train_loader = dataloader.train_loader(args)

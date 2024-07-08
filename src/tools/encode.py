@@ -65,15 +65,17 @@ def main(args):
     if args.img_path:
         code = encode(model, transform, args.img_path)
         np.save(args.output_path, code)
-    else:
+    else:    
+        if not os.path.exists(args.output_path):
+            os.makedirs(args.output_path)
         img_folder = os.listdir(args.img_folder)
         num_images = min(args.num_images, len(img_folder))
-        for i, filename in enumerate(tqdm(img_folder, initial=1, total=num_images)):
+        for i, filename in enumerate(tqdm(img_folder, total=num_images)):
+            if i == num_images:
+                break
             code = encode(model, transform, os.path.join(args.img_folder, filename))
             output_file = os.path.join(args.output_path, "encoded_{}{}".format(filename[:filename.rfind('.')], '.npy'))
             np.save(output_file, code)
-            if i == num_images - 1:
-                break
             
 
 if __name__ == '__main__':
