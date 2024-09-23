@@ -1,0 +1,210 @@
+from PIL import Image
+from torchvision import transforms
+from torch.utils.data import Dataset, DataLoader
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+import porespy as ps
+import sys
+sys.path.append('.')
+import dataloader
+
+class MicrostructureDataset(Dataset):
+    def __init__(self, file_path, transform=None):
+        self.image_paths = []
+        self.labels = []
+        with open(file_path, 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                path, label = line.strip().split(' ')
+                self.image_paths.append(path)
+                self.labels.append(int(label))
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        image = Image.open(self.image_paths[idx])
+        if self.transform:
+            image = self.transform(image)
+        return image, self.labels[idx]
+
+transform = transforms.Compose([
+    transforms.Grayscale(),
+    transforms.RandomCrop(64), # add random rotation
+    transforms.ToTensor(),
+])
+
+dataset = MicrostructureDataset('list/MR_jpg_list.txt', transform=transform)
+dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
+
+class Generator(nn.Module):
+    def __init__(self):
+        super(Generator, self).__init__()
+        self.main = nn.Sequential(
+            nn.ConvTranspose2d(100, 1024, kernel_size=(3, 2), stride=(1, 1), padding=(1, 1), bias=False),
+            nn.BatchNorm2d(1024),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(1024, 512, kernel_size=(4, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.BatchNorm2d(512),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(512, 256, kernel_size=(4, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.BatchNorm2d(256),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(256, 128, kernel_size=(4, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.BatchNorm2d(128),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(128, 64, kernel_size=(4, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(64, 32, kernel_size=(4, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.BatchNorm2d(32),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(32, 16, kernel_size=(4, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.BatchNorm2d(16),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(16, 1, kernel_size=(4, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.Tanh()
+        )
+
+    def forward(self, input):
+        return self.main(input)
+
+
+class Discriminator(nn.Module):
+    def __init__(self):
+        super(Discriminator, self).__init__()
+        self.main = nn.Sequential(
+            nn.Conv2d(1, 64, 4, 2, 1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(64, 64 * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(64 * 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(64 * 2, 64 * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(64 * 4),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(64 * 4, 64 * 8, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(64 * 8),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(64 * 8, 1, 4, 1, 0, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, input):
+        return self.main(input)
+
+netG = Generator().to(device)
+netD = Discriminator().to(device)
+
+criterion = nn.BCELoss()
+optimizerD = optim.Adam(netD.parameters(), lr=0.0002, betas=(0.5, 0.999), weight_decay=1e-4)
+optimizerG = optim.Adam(netG.parameters(), lr=0.0003, betas=(0.5, 0.999), weight_decay=1e-4)
+
+def lineal_path_function(image):
+    return ps.metrics.lineal_path_distribution(image)
+
+def chord_length_distribution(image):
+    return ps.metrics.chord_length_distribution(image)
+
+def pore_size_distribution(image):
+    return ps.metrics.pore_size_distribution(image)
+
+def two_point_correlation(image):
+    return ps.metrics.two_point_correlation(image)
+
+num_epochs = 3000
+fixed_noise = torch.randn(64, 100, 125, 89, device=device)
+
+for epoch in range(num_epochs):
+    for i, (images, _) in enumerate(dataloader):
+        netD.zero_grad()
+        real_images = images.to(device)
+        b_size = real_images.size(0)
+        label = torch.full((b_size,), 1., device=device)
+        output = netD(real_images).view(-1)
+        errD_real = criterion(output, label)
+        errD_real.backward()
+
+        noise = torch.randn(b_size, 100, 125, 89, device=device)
+        fake_images = netG(noise)
+        label.fill_(0.)
+        output = netD(fake_images.detach()).view(-1)
+        errD_fake = criterion(output, label)
+        errD_fake.backward()
+        optimizerD.step()
+
+        netG.zero_grad()
+        label.fill_(1.)
+        output = netD(fake_images).view(-1)
+        errG = criterion(output, label)
+        errG.backward()
+        optimizerG.step()
+
+        if i % 50 == 0:
+            print(f'Epoch [{epoch+1}/{num_epochs}] Batch [{i}/{len(dataloader)}] Loss D: {errD_real + errD_fake}, Loss G: {errG}')
+
+    with torch.no_grad():
+        fake_images = netG(fixed_noise).detach().cpu()
+
+    if epoch % 10 == 0:
+        real_image = images[0].cpu().numpy()
+        fake_image = fake_images[0].cpu().numpy()
+
+        lpf_real = lineal_path_function(real_image[0])
+        lpf_fake = lineal_path_function(fake_image[0])
+
+        cld_real = chord_length_distribution(real_image[0])
+        cld_fake = chord_length_distribution(fake_image[0])
+
+        psd_real = pore_size_distribution(real_image[0])
+        psd_fake = pore_size_distribution(fake_image[0])
+
+        tpc_real = two_point_correlation(real_image[0])
+        tpc_fake = two_point_correlation(fake_image[0])
+
+        print(f'+------------------------+-------------------+-------------------+')
+        print(f'| Metric                 | Real              | Fake              |')
+        print(f'+------------------------+-------------------+-------------------+')
+        print(f'| Lineal Path Function   | {np.mean(lpf_real.L):.6f}       | {np.mean(lpf_fake.L):.6f}       |')
+        print(f'| Chord Length Dist.     | {np.mean(cld_real.L):.6f}       | {np.mean(cld_fake.L):.6f}       |')
+        print(f'| Pore Size Distribution | {np.mean(psd_real.bin_centers):.6f}       | {np.mean(psd_fake.bin_centers):.6f}       |')
+        print(f'| Two-Point Correlation  | {np.mean(tpc_real.probability):.6f}       | {np.mean(tpc_fake.probability):.6f}       |')
+        print(f'+------------------------+-------------------+-------------------+')
+
+    if (epoch + 1) % 300 == 0:        
+        torch.save({
+            'epoch': epoch,
+            'generator_state_dict': netG.state_dict(),
+            'discriminator_state_dict': netD.state_dict(),
+            'optimizerG_state_dict': optimizerG.state_dict(),
+            'optimizerD_state_dict': optimizerD.state_dict(),
+        }, f'checkpoint/checkpoint_epoch_{epoch + 1}.pth')
+
+
+def sample_and_assemble_images(generator, num_images, save_dir, device, debug=False):
+    generator.eval()
+    num_samples = 1  # or any batch size you want to use for generation
+    
+    for n in range(num_images):
+        # Generate noise with the shape used during training
+        noise = torch.randn(num_samples, 100, 125, 89, device=device)
+        
+        with torch.no_grad():
+            fake_images = generator(noise).detach().cpu()
+        
+        fake_images = fake_images.squeeze(0)
+        
+        # Convert to PIL image and upsample to 3072x2048
+        img = transforms.ToPILImage()(fake_images)
+        img = img.resize((3072, 2048), Image.LANCZOS)
+        
+        save_path = os.path.join(save_dir, f'generated_image_{n}.png')
+        img.save(save_path)
+
+# Example usage
+# Assuming 'generator' is your trained generator model and 'device'

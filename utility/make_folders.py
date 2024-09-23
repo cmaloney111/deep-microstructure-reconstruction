@@ -6,7 +6,7 @@ def make_folders(source_dir):
         if not filename.endswith('.tif'):
             continue
         
-        underscore_index = filename.rfind('_')
+        underscore_index = filename.rfind('_', 0, filename.rfind('_')-1)
         percent_index = filename.index('%')
         percentage = filename[underscore_index + 1:percent_index + 1]
         
@@ -18,5 +18,5 @@ def make_folders(source_dir):
         target_path = os.path.join(target_dir, filename)
         shutil.move(source_path, target_path)
 
-source_dir = r"..\data\binarized_images"
+source_dir = r"..\data\images_2"
 make_folders(source_dir)

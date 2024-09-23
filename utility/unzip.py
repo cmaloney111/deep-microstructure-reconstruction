@@ -11,8 +11,8 @@ def unzip_files(source_dir, destination_dir):
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(destination_dir)
 
-source_dir = r"..\data\zip"
-destination_dir = r"..\data\images"
+source_dir = r"..\data\zip_2"
+destination_dir = r"..\data\images_2"
 
 unzip_files(source_dir, destination_dir)
 
