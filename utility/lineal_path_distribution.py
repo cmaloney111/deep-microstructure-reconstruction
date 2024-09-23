@@ -1,32 +1,4 @@
-import numpy as np
-from porespy.tools import Results
-import matplotlib.pyplot as plt
 
-
-def _parse_histogram(h, voxel_size=1, density=True):
-    delta_x = h[1]
-    P = h[0]
-    bin_widths = delta_x[1:] - delta_x[:-1]
-    temp = P * (bin_widths)
-    C = np.cumsum(temp[-1::-1])[-1::-1]
-    S = P * (bin_widths)
-    if not density:
-        P /= np.max(P)
-        temp_sum = np.sum(P * bin_widths)
-        C /= temp_sum
-        S /= temp_sum
-
-    bin_edges = delta_x * voxel_size
-    bin_widths = (bin_widths) * voxel_size
-    bin_centers = ((delta_x[1:] + delta_x[:-1]) / 2) * voxel_size
-    hist = Results()
-    hist.pdf = P
-    hist.cdf = C
-    hist.relfreq = S
-    hist.bin_centers = bin_centers
-    hist.bin_edges = bin_edges
-    hist.bin_widths = bin_widths
-    return hist
 
 
 def lineal_path_distribution(im, bins=10, voxel_size=1, log=False):
