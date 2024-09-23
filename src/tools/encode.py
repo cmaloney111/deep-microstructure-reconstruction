@@ -57,8 +57,8 @@ def main(args):
     utils.load_dict(args.checkpoint, model)
     
     transform = transforms.Compose([
-                    transforms.Resize(256),                   
-                    transforms.CenterCrop(224),
+                    # transforms.Resize(256),                   
+                    transforms.RandomCrop(224),
                     transforms.ToTensor()
                   ])
 

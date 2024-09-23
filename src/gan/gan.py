@@ -31,11 +31,11 @@ class MicrostructureDataset(Dataset):
 
 transform = transforms.Compose([
     transforms.Grayscale(),
-    transforms.Resize((64, 64)),
+    transforms.RandomCrop(64), # add random rotation
     transforms.ToTensor(),
 ])
 
-dataset = MicrostructureDataset('list/MR_bin_jpg_list.txt', transform=transform)
+dataset = MicrostructureDataset('list/MR_jpg_list.txt', transform=transform)
 dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -57,7 +57,7 @@ class Generator(nn.Module):
             nn.BatchNorm2d(64),
             nn.ReLU(True),
             nn.ConvTranspose2d(64, 1, 4, 2, 1, bias=False),
-            nn.Tanh()
+            nn.Sigmoid() # 0 to 1
         )
 
     def forward(self, input):
@@ -104,7 +104,7 @@ def pore_size_distribution(image):
 def two_point_correlation(image):
     return ps.metrics.two_point_correlation(image)
 
-num_epochs = 3001
+num_epochs = 3000
 fixed_noise = torch.randn(64, 100, 1, 1, device=device)
 
 for epoch in range(num_epochs):
@@ -135,18 +135,11 @@ for epoch in range(num_epochs):
         if i % 50 == 0:
             print(f'Epoch [{epoch+1}/{num_epochs}] Batch [{i}/{len(dataloader)}] Loss D: {errD_real + errD_fake}, Loss G: {errG}')
 
-    if epoch % 50 == 0:
-        torch.save({
-            'epoch': epoch,
-            'generator_state_dict': netG.state_dict(),
-            'discriminator_state_dict': netD.state_dict(),
-            'optimizerG_state_dict': optimizerG.state_dict(),
-            'optimizerD_state_dict': optimizerD.state_dict(),
-        }, f'results/gan/checkpoint_epoch_{epoch}.pth')
 
-        with torch.no_grad():
-            fake_images = netG(fixed_noise).detach().cpu()
+    with torch.no_grad():
+        fake_images = netG(fixed_noise).detach().cpu()
 
+    if epoch % 10 == 0:
         real_image = images[0].cpu().numpy()
         fake_image = fake_images[0].cpu().numpy()
 
@@ -170,3 +163,12 @@ for epoch in range(num_epochs):
         print(f'| Pore Size Distribution | {np.mean(psd_real.bin_centers):.6f}       | {np.mean(psd_fake.bin_centers):.6f}       |')
         print(f'| Two-Point Correlation  | {np.mean(tpc_real.probability):.6f}       | {np.mean(tpc_fake.probability):.6f}       |')
         print(f'+------------------------+-------------------+-------------------+')
+
+    if (epoch + 1) % 300 == 0:        
+        torch.save({
+            'epoch': epoch,
+            'generator_state_dict': netG.state_dict(),
+            'discriminator_state_dict': netD.state_dict(),
+            'optimizerG_state_dict': optimizerG.state_dict(),
+            'optimizerD_state_dict': optimizerD.state_dict(),
+        }, f'checkpoint/checkpoint_epoch_{epoch + 1}.pth')
