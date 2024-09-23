@@ -11,7 +11,7 @@ import random
 import argparse
 from tqdm import tqdm
 
-from models_2 import Generator
+from gan.FinalGAN.models_cond import Generator
 
 
 def load_params(model, new_param):
