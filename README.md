@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Microstructure Image GAN
 
 This project trains a Generative Adversarial Network (GAN) to synthesize realistic microstructure images based on input RGB image data. It supports multi-class training and saves both intermediate and final results for further analysis.
@@ -103,3 +104,6 @@ After training, you will find:
 
 - Generated images (images folder)
 - Model checkpoints (models folder)
+=======
+# deep-microstructure-reconstruction
+>>>>>>> 9934159ec532f3c5181e0e15ca62269aedc54c0a
