@@ -169,6 +169,7 @@ def train(args):
     if use_cuda:
         device = torch.device(f"cuda:{args.cuda}")
 
+    print(f"Using device: {device}")
     # Calculate or load porosity targets if in conditional mode
     class_porosities = None
     if is_conditional:
@@ -343,6 +344,27 @@ def train(args):
             load_params(netG, avg_param_G)
             with torch.no_grad():
                 if is_conditional:
+                    # Create a mapping from class indices to class names
+                    class_names = [d for d in os.listdir(data_root) if os.path.isdir(os.path.join(data_root, d))]
+                    class_names.sort()  # Sort to match the index order
+                    
+                    # Generate samples for each class
+                    for class_idx in range(num_classes):
+                        # Get the actual class name
+                        class_name = class_names[class_idx]
+                        
+                        # Create class-specific labels tensor filled with this class index
+                        class_labels = torch.full((8,), class_idx, dtype=torch.long, device=device)
+                        
+                        # Generate images with fixed noise and this class
+                        class_images = netG(fixed_noise, class_labels)[0].add(1).mul(0.5)
+                        
+                        # Save class-specific samples with class name
+                        vutils.save_image(class_images, 
+                                        saved_image_folder+'/class_%s_iter_%d.jpg'%(class_name, iteration),
+                                        nrow=4)
+                    
+                    # Also save the original mixed-class samples for backward compatibility
                     vutils.save_image(netG(fixed_noise, fixed_labels)[0].add(1).mul(0.5), 
                                     saved_image_folder+'/%d.jpg'%iteration, nrow=4)
                 else:
